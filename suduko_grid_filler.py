@@ -31,15 +31,17 @@ class Suduko_gird_value_generator:
         self.A5 = self.__mid_sub_grid_filler(self.A5)
         self.A2, self.A8 = self.__side_neighbour_grid_filler(self.A5, self.A2, self.A8)
         self.A4, self.A6 = self.__side_neighbour_grid_filler(self.A5, self.A4, self.A6, horizontal=True)
+        self.A1, self.A7 = self.__fill_subgrid_corner(self.A1, self.A2, self.A3, self.A4, self.A7, self.A8, self.A9)
+        self.A3, self.A9 = self.__fill_subgrid_corner(self.A3, self.A2, self.A1, self.A4, self.A9, self.A8, self.A7)
     
-    
+    #function to fill middle subgrid
     def __mid_sub_grid_filler(self, mid):
         
         np.random.shuffle(self.filler)    
         mid = self.filler.reshape((3, 3)).copy()
         return mid
         
-    
+    #function to fill direct neighbour subgrid
     def __side_neighbour_grid_filler(self, mid, side , opo_side, horizontal=False):
         
         #rotate if grid horizontal
@@ -111,6 +113,78 @@ class Suduko_gird_value_generator:
             opo_side = np.rot90(opo_side, 3)
                     
         return side, opo_side
+        
+    #function to fill corner grid
+    #focus sub gird : m, n
+    #corelated grid : start counting from left to right and top to bottom
+    def __fill_subgrid_corner(self, m, mh1, mh2, mnv, n, nh1, nh2):
+        
+        def __backtrack(m, mh1, mh2, mnv, n, nh1, nh2):
+            
+            
+            def __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i):
+                
+                def __fill(x,y,z,t,i,j,s,e):
+                    inner_count = 0
+                    while inner_count < 50:
+                        if  t[s:e][j] not in y[j, :] and t[s:e][j] not in z[j, :]:
+                            x[j, i] = t[s:e][j]
+                            break
+                        else:
+                            t[j+s:e] = np.random.permutation(t[j+s:e])
+                            inner_count += 1
+                            continue 
+                    else:
+                        return False
+                    return True
+                    
+                count = 0
+                while 50 > count:
+                    if not any(ele in m for ele in t[:3]) and not any(ele in n for ele in t[3:]):
+                        filled = False
+                        for j in range(3):
+                            
+                            x = __fill(m,mh1,mh2,t,i,j,0,3)
+                            y = __fill(n,nh1,nh2,t,i,j,3,6)
+                            
+                            if not x or not y:
+                                break
+                            
+                        else:
+                            break
+                    else:
+                        t = np.random.permutation(t)
+                        count += 1
+                else:
+                    return  False
+                return True
+            
+            valid = False
+            for i in range(3):
+                
+                t = [x for x in range(1,10) if x not in mnv[:, i]]
+                x =  __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i)
+                if not x:
+                    break
+            else:
+                valid = True
+            return valid
+        
+        count = 0
+        is_filled = True
+        while 500 > count:
+            
+            x = __backtrack(m, mh1, mh2, mnv, n, nh1, nh2)
+            if x:
+                break
+            m = np.zeros((3, 3), dtype='i')
+            n = np.zeros((3, 3), dtype='i')
+            count += 1
+        else:
+            is_filled = False
+            print('failed !!!!invalid suduko')
+
+        return m , n 
         
     
 a = Suduko_gird_value_generator(main_grid)
