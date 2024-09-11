@@ -27,14 +27,13 @@ class Suduko_gird_value_generator:
         main_grid[3:6, :3], main_grid[3:6, 3:6], main_grid[3:6, 6:9] = self.A4 , self.A5, self.A6
         main_grid[6:9, :3], main_grid[6:9, 3:6], main_grid[6:9, 6:9] = self.A7 , self.A8, self.A9
                 
-        
     
     def __sub_grid_value_generator(self):
         self.A5, self.is_filled[4] = self.__mid_sub_grid_filler(self.A5)
         self.A2, self.A8, self.is_filled[1], self.is_filled[7] = self.__side_neighbour_grid_filler(self.A5, self.A2, self.A8)
         self.A4, self.A6, self.is_filled[3], self.is_filled[5] = self.__side_neighbour_grid_filler(self.A5, self.A4, self.A6, horizontal=True)
-        self.A1, self.A7, self.failed_A1_A7 = self.__fill_subgrid_corner(self.A1, self.A2, self.A3, self.A4, self.A7, self.A8, self.A9)
-        self.A3, self.A9, self.failed_A3_A9 = self.__fill_subgrid_corner(self.A3, self.A2, self.A1, self.A4, self.A9, self.A8, self.A7)
+        self.A1, self.A7, self.is_filled[0], self.is_filled[6] = self.__fill_subgrid_corner(self.A1, self.A2, self.A3, self.A4, self.A7, self.A8, self.A9)
+        self.A3, self.A9, self.is_filled[2], self.is_filled[8] = self.__fill_subgrid_corner(self.A3, self.A2, self.A1, self.A4, self.A9, self.A8, self.A7)
     
     #function to fill middle subgrid
     def __mid_sub_grid_filler(self, mid):
@@ -123,11 +122,12 @@ class Suduko_gird_value_generator:
     #corelated grid : start counting from left to right and top to bottom
     def __fill_subgrid_corner(self, m, mh1, mh2, mnv, n, nh1, nh2):
         
-        def __backtrack(m, mh1, mh2, mnv, n, nh1, nh2):
+        def __backtrack(m, mh1, mh2, mnv, n, nh1, nh2, p=True):
             
-            def __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i):
+            def __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i, p=True):
                 
                 def __fill(x,y,z,t,i,j,s,e):
+                    
                     inner_count = 0
                     while inner_count < 20:
                         if  t[s:e][j] not in y[j, :] and t[s:e][j] not in z[j, :]:
@@ -135,65 +135,88 @@ class Suduko_gird_value_generator:
                             break
                         else:
                             t[j+s:e] = np.random.permutation(t[j+s:e])
-                            inner_count += 1
-                            
+                            inner_count += 1   
                     else:
-                        #
-                        #stuck here in infinite loop
-                        #
+                        #stuck here
+                        print('in __fill():False')
                         return False
-                    return True
                     
-                count = 0
-                while 50 > count:
-                    if not any(ele in m for ele in t[:3]) and not any(ele in n for ele in t[3:]):
-                        filled = False
-                        for j in range(3):
-                            
-                            x = __fill(m,mh1,mh2,t,i,j,0,3)
-                            y = __fill(n,nh1,nh2,t,i,j,3,6)
-                            
-                            if not x or not y:
+                    print('in __fill():True')
+                    
+                    return True
+                
+                
+                def __nested_fill(x,y,z,t,i,s,e):
+                    count = 0
+                    
+                    while 20 > count:
+                        if not any(ele in x for ele in t[s:e]):
+                            for j in range(3):
+                                A = __fill(x,y,z,t,i,j,s,e)
+                                if not A :
+                                    break        
+                            else:
                                 break
-                            
                         else:
-                            break
+                            t[s:] = np.random.permutation(t[s:])
+                            count += 1
                     else:
-                        t = np.random.permutation(t)
-                        count += 1
-                else:
-                    return  False
-                return True
+                        print('in __nested_fill():False')
+                        return False
+                    
+                    print('in __nested_fill():True')
+                    
+                    return True
+                
+                a = p
+                b = False
+                
+                if p:    
+                    a = __nested_fill(m,mh1,mh2,t,i,0,3)
+                b = __nested_fill(n,nh1,nh2,t,i,3,6)
+                
+                print('in __nested_backtrack()')
+                
+                return a, b
             
-            valid = False
+            a , b = p, False
             for i in range(3):
                 
                 t = [x for x in range(1,10) if x not in mnv[:, i]]
-                x =  __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i)
-                if not x:
+                a, b =  __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i, p)
+                if not a or not b:
                     break
-            else:
-                valid = True
-            return valid
+            
+            print('in __backtrack()')
+            
+            return a, b
         
         count = 0
-        failed= False
-        while 50 > count:
+        a, b = False, False
+        while 200 > count:
             
-            x = __backtrack(m, mh1, mh2, mnv, n, nh1, nh2)
-            if x:
+            if not a:
+                a, b = __backtrack(m, mh1, mh2, mnv, n, nh1, nh2)
+            if not b:
+                a, b = __backtrack(m, mh1, mh2, mnv, n, nh1, nh2, p=False)
+                
+                
+            if a and b:
                 break
-            m = np.zeros((3, 3), dtype='i')
-            n = np.zeros((3, 3), dtype='i')
+            
+            if not a:
+                m = np.zeros((3, 3), dtype='i')
+            if not b:
+                n = np.zeros((3, 3), dtype='i')
             count += 1
         else:
-            failed = True 
+            print('No solution found')
             
             print('failed !!!!invalid suduko')
         
         #debugging message
-        print('corners , failed =',failed)
-        return m , n , failed
+        print('corners , a =',a , 'b =', b)
+        return m , n , a, b
         
         
     #try to fill manually if failed at corners
