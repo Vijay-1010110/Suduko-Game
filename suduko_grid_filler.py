@@ -2,6 +2,7 @@ import numpy as np
 import sys
 
 main_grid = np.zeros((9,9), dtype='i')
+is_grid_fill = [[False for _ in range(3)] for _ in range(3)]
 
 class Suduko_gird_value_generator:
     
@@ -16,9 +17,10 @@ class Suduko_gird_value_generator:
         self.A8 = np.zeros((3, 3), dtype='i')
         self.A9 = np.zeros((3, 3), dtype='i')
         
+        self.is_filled = [False for _ in range(9)]
+        
         self.filler = np.arange(1,10)
         self.__sub_grid_value_generator()
-        
         
         
         main_grid[:3, :3], main_grid[:3, 3:6], main_grid[:3, 6:9]    = self.A1 , self.A2, self.A3
@@ -28,40 +30,40 @@ class Suduko_gird_value_generator:
         
     
     def __sub_grid_value_generator(self):
-        self.A5 = self.__mid_sub_grid_filler(self.A5)
-        self.A2, self.A8 = self.__side_neighbour_grid_filler(self.A5, self.A2, self.A8)
-        self.A4, self.A6 = self.__side_neighbour_grid_filler(self.A5, self.A4, self.A6, horizontal=True)
-        self.A1, self.A7 = self.__fill_subgrid_corner(self.A1, self.A2, self.A3, self.A4, self.A7, self.A8, self.A9)
-        self.A3, self.A9 = self.__fill_subgrid_corner(self.A3, self.A2, self.A1, self.A4, self.A9, self.A8, self.A7)
+        self.A5, self.is_filled[4] = self.__mid_sub_grid_filler(self.A5)
+        self.A2, self.A8, self.is_filled[1], self.is_filled[7] = self.__side_neighbour_grid_filler(self.A5, self.A2, self.A8)
+        self.A4, self.A6, self.is_filled[3], self.is_filled[5] = self.__side_neighbour_grid_filler(self.A5, self.A4, self.A6, horizontal=True)
+        self.A1, self.A7, self.failed_A1_A7 = self.__fill_subgrid_corner(self.A1, self.A2, self.A3, self.A4, self.A7, self.A8, self.A9)
+        self.A3, self.A9, self.failed_A3_A9 = self.__fill_subgrid_corner(self.A3, self.A2, self.A1, self.A4, self.A9, self.A8, self.A7)
     
     #function to fill middle subgrid
     def __mid_sub_grid_filler(self, mid):
         
         np.random.shuffle(self.filler)    
         mid = self.filler.reshape((3, 3)).copy()
-        return mid
+        
+        return mid, True
         
     #function to fill direct neighbour subgrid
     def __side_neighbour_grid_filler(self, mid, side , opo_side, horizontal=False):
         
         #rotate if grid horizontal
+        
         if horizontal:
             mid = np.rot90(mid)
             side = np.rot90(side)
             opo_side = np.rot90(opo_side)
             
+            
 
-        def __backtrack(mid, side, opo_side, prev_t):
+        def __backtrack(mid, side, opo_side):
             
             side = np.zeros((3, 3), dtype='i')
             opo_side = np.zeros((3, 3), dtype='i')
             
             t = mid[:, 1:].copy()
-            if prev_t is not None:
-                while prev_t != t:
-                    t = np.random.permutation(t.flatten()).reshape(3, 2)
-            else:
-                t = np.random.permutation(t.flatten()).reshape(3, 2)
+
+            t = np.random.permutation(t.flatten()).reshape(3, 2)
             
             side[:, 0] = t[:, 0].copy()
             opo_side[:, 0] = t[:, 1].copy()
@@ -84,25 +86,26 @@ class Suduko_gird_value_generator:
                             
                     
                     count += 1
-                    if count > 1000:
+                    if count > 100:
                         
                         print("side_neighbour : Invalid suduko\ncol_no :",x ,', direction-horizontal :',horizontal)
                         print("pos :",e_sub_grid)
                         
                         
                         
-                        return side, opo_side, t, False
+                        return side, opo_side, False
                         
                     continue
                 
-            return side, opo_side,None, True
+            return side, opo_side, True
                 
         fill = False
         o_count = 0
-        prev_t = None
+        
         while not fill:
-            side, opo_side, prev_t, fill = __backtrack(mid, side, opo_side, prev_t)
-            if o_count > 1000:
+            side, opo_side, fill = __backtrack(mid, side, opo_side)
+            o_count += 1
+            if o_count > 10:
                 print("still invalid")
                 sys.exit()
             
@@ -111,8 +114,9 @@ class Suduko_gird_value_generator:
             mid = np.rot90(mid, 3)
             side = np.rot90(side, 3)
             opo_side = np.rot90(opo_side, 3)
-                    
-        return side, opo_side
+        #debugging message
+        print('side neighbour')            
+        return side, opo_side, True, True 
         
     #function to fill corner grid
     #focus sub gird : m, n
@@ -121,20 +125,22 @@ class Suduko_gird_value_generator:
         
         def __backtrack(m, mh1, mh2, mnv, n, nh1, nh2):
             
-            
             def __nested_backtrack(m, mh1, mh2, n, nh1, nh2, t, i):
                 
                 def __fill(x,y,z,t,i,j,s,e):
                     inner_count = 0
-                    while inner_count < 50:
+                    while inner_count < 20:
                         if  t[s:e][j] not in y[j, :] and t[s:e][j] not in z[j, :]:
                             x[j, i] = t[s:e][j]
                             break
                         else:
                             t[j+s:e] = np.random.permutation(t[j+s:e])
                             inner_count += 1
-                            continue 
+                            
                     else:
+                        #
+                        #stuck here in infinite loop
+                        #
                         return False
                     return True
                     
@@ -171,8 +177,8 @@ class Suduko_gird_value_generator:
             return valid
         
         count = 0
-        is_filled = True
-        while 500 > count:
+        failed= False
+        while 50 > count:
             
             x = __backtrack(m, mh1, mh2, mnv, n, nh1, nh2)
             if x:
@@ -181,11 +187,26 @@ class Suduko_gird_value_generator:
             n = np.zeros((3, 3), dtype='i')
             count += 1
         else:
-            is_filled = False
+            failed = True 
+            
             print('failed !!!!invalid suduko')
-
-        return m , n 
         
+        #debugging message
+        print('corners , failed =',failed)
+        return m , n , failed
+        
+        
+    #try to fill manually if failed at corners
+    def __try_to_fill_manually(self, m, mh1, mh2, mnv, n, nh1, nh2):
+        
+        x0 = np.concatenate((mh1[1, :], mh2[2, :]))
+        x0 = [i for i in range(1,10) if i not in x0]
+        x0 = np.random.permutation(x0)
+        
+        while True:
+            break
+        
+            
     
 a = Suduko_gird_value_generator(main_grid)
 
